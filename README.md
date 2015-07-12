@@ -18,3 +18,7 @@ __Authentication__
 Actually the authentication doesn't work anymore.  MyAnimeList changed the login page and I don't have the time to maintain the wrapper.
 
 One thing to do is to review the *GetCookies* method.  To test if the authentication works, just use the *GetAnimeDetailAsync()* in the *AnimeServiceTest* class.
+
+__API KEY__
+
+To receive an API key you need to contact an admin on http//myanimelist.net (http://myanimelist.net/about.php?go=contact)
