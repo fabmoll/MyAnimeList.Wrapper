@@ -21,4 +21,4 @@ One thing to do is to review the *GetCookies* method.  To test if the authentica
 
 __API KEY__
 
-To receive an API key you need to contact an admin on http//myanimelist.net (http://myanimelist.net/about.php?go=contact)
+To receive an API key you need to use the following form : https://atomiconline.wufoo.com/forms/mal-api-usage-notification/
