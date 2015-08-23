@@ -74,9 +74,14 @@ namespace MyAnimeList.Wrapper.Services
 
         public async Task<MangaDetail> GetMangaDetailAsync(string login, string password, int mangaId)
         {
-            var cookies = await CookieHelper.GetCookies(login, password, RestClient);
+			List<Cookie> cookies = null;
 
-            RestClient.BaseUrl = new Uri(string.Format("http://myanimelist.net/manga/{0}", mangaId));
+			if (Cookies.Count == 0)
+			{
+				cookies = await CookieHelper.GetCookies(login, password, UserAgent);
+			}
+
+			RestClient.BaseUrl = new Uri(string.Format("http://myanimelist.net/manga/{0}", mangaId));
 
             var request = GetRestRequest(Method.GET, cookies);
 
@@ -243,7 +248,7 @@ namespace MyAnimeList.Wrapper.Services
                 if (score != null)
                 {
                     double memberScore;
-                    if (double.TryParse(score.NextSibling.InnerText, NumberStyles.Any, CultureInfo.InvariantCulture, out memberScore))
+                    if (double.TryParse(score.NextSibling.NextSibling.InnerText, NumberStyles.Any, CultureInfo.InvariantCulture, out memberScore))
                         mangaDetail.MembersScore = memberScore;
                     else
                     {
@@ -344,7 +349,7 @@ namespace MyAnimeList.Wrapper.Services
                     var alternativeVersion =
                         Regex.Match(
                             relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Alternative versions?: ?(<a .+?)<br");
+							"Alternative versions?:?(.+?<br)");
 
                     if (!string.IsNullOrEmpty(alternativeVersion.ToString()))
                     {
@@ -358,7 +363,7 @@ namespace MyAnimeList.Wrapper.Services
                     var adaptation =
                         Regex.Match(
                             relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Adaptation: ?(<a .+?)<br");
+							"Adaptation:?(.+?<br)");
 
                     if (!string.IsNullOrEmpty(adaptation.ToString()))
                     {
@@ -373,7 +378,7 @@ namespace MyAnimeList.Wrapper.Services
                     var prequel =
                         Regex.Match(
                             relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Prequel: ?(<a .+?)<br");
+							"Prequel:?(.+?<br)");
 
                     mangaDetail.RelatedManga = new List<MangaSummary>();
 
@@ -383,7 +388,7 @@ namespace MyAnimeList.Wrapper.Services
                     }
 
                     var sequel = Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Sequel: ?(<a .+?)<br");
+							"Sequel:?(.+?<br)");
 
                     if (!string.IsNullOrEmpty(sequel.ToString()))
                     {
@@ -391,7 +396,7 @@ namespace MyAnimeList.Wrapper.Services
                     }
 
                     var parentStory = Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                           "Parent story: ?(<a .+?)<br");
+						   "Parent story:?(.+?<br)");
 
                     if (!string.IsNullOrEmpty(parentStory.ToString()))
                     {
@@ -399,7 +404,7 @@ namespace MyAnimeList.Wrapper.Services
                     }
 
                     var sideStory = Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Side story: ?(<a .+?)<br");
+							"Side story:?(.+?<br)");
 
 
                     if (!string.IsNullOrEmpty(sideStory.ToString()))
@@ -408,7 +413,7 @@ namespace MyAnimeList.Wrapper.Services
                     }
 
                     var character = Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                            "Character: ?(<a .+?)<br");
+							"Character:?(.+?<br)");
 
                     if (!string.IsNullOrEmpty(character.ToString()))
                     {
@@ -416,7 +421,7 @@ namespace MyAnimeList.Wrapper.Services
                     }
 
                     var spinOff = Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                         "Spin-off: ?(<a .+?)<br");
+						 "Spin-off:?(.+?<br)");
 
 
                     if (!string.IsNullOrEmpty(spinOff.ToString()))
@@ -425,7 +430,7 @@ namespace MyAnimeList.Wrapper.Services
                     }
 
                     var summary = Regex.Match(relatedManga.ParentNode.InnerHtml.Substring(relatedManga.ParentNode.InnerHtml.IndexOf("<h2>")),
-                        "Summary: ?(<a .+?)<br");
+						"Summary:?(.+?<br)");
 
                     if (!string.IsNullOrEmpty(summary.ToString()))
                     {
@@ -538,7 +543,7 @@ namespace MyAnimeList.Wrapper.Services
 
             relatedDocument.LoadHtml(htmlContent);
 
-            foreach (var alternativeNode in relatedDocument.DocumentNode.ChildNodes.Where(c => c.Name == "a").Select(x => x))
+            foreach (var alternativeNode in relatedDocument.DocumentNode.SelectNodes("//a[@href]").Select(x => x))
             {
                 var mangaSummary = new MangaSummary
                 {
@@ -573,7 +578,7 @@ namespace MyAnimeList.Wrapper.Services
 
             relatedDocument.LoadHtml(htmlContent);
 
-            foreach (var alternativeNode in relatedDocument.DocumentNode.ChildNodes.Where(c => c.Name == "a").Select(x => x))
+            foreach (var alternativeNode in relatedDocument.DocumentNode.SelectNodes("//a[@href]").Select(x => x))
             {
                 var animeSummary = new AnimeSummary
                 {

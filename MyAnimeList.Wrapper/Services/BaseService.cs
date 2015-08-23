@@ -6,55 +6,62 @@ using RestSharp;
 
 namespace MyAnimeList.Wrapper.Services
 {
-    public class BaseService
-    {
-        protected RestClient RestClient;
-        protected List<Cookie> Cookies;
+	public class BaseService
+	{
+		protected RestClient RestClient;
+		protected List<Cookie> Cookies;
+		public string UserAgent { get; set; }
 
-        protected BaseService(string userAgent)
-        {
-            RestClient = new RestClient { UserAgent = userAgent };
+		protected BaseService(string userAgent)
+		{
+			RestClient = new RestClient { UserAgent = userAgent };
 
-            Cookies = new List<Cookie>();
-        }
+			UserAgent = userAgent;
 
-        protected IRestRequest GetRestRequest(Method method)
-        {
-            var request = new RestRequest(method);
+			Cookies = new List<Cookie>();
+		}
 
-            return request;
-        }
+		protected IRestRequest GetRestRequest(Method method)
+		{
+			var request = new RestRequest(method);
 
-        protected IRestRequest GetRestRequest(Method method, List<Cookie> cookies)
-        {
-            var request = GetRestRequest(method);
+			return request;
+		}
 
-            Cookies.Clear();
+		protected IRestRequest GetRestRequest(Method method, List<Cookie> cookies)
+		{
+			var request = GetRestRequest(method);
 
-            foreach (var cookie in cookies)
-            {
-                request.AddCookie(cookie.Name, cookie.Value);
-                Cookies.Add(cookie);
-            }
+			if (cookies != null)
+			{
 
-            return request;
-        }
+				Cookies.Clear();
 
-        protected async Task<string> ExecuteTaskASync(IRestRequest request)
-        {
-            //Workaround to invalidate WebRequest cache from client
-            request.AddParameter("no-cache", Guid.NewGuid());
+				foreach (var cookie in cookies)
+				{
+					request.AddCookie(cookie.Name, cookie.Value);
+					Cookies.Add(cookie);
+				}
+			}
 
-            var response = await RestClient.ExecuteTaskAsync(request);
+			return request;
+		}
 
-            if (response.ErrorException != null)
-                throw response.ErrorException;
+		protected async Task<string> ExecuteTaskASync(IRestRequest request)
+		{
+			//Workaround to invalidate WebRequest cache from client
+			request.AddParameter("no-cache", Guid.NewGuid());
 
-            HttpRequestHelper.HandleHttpCodes(response.StatusCode);
+			var response = await RestClient.ExecuteTaskAsync(request);
 
-            return response.Content;
-        }
+			if (response.ErrorException != null)
+				throw response.ErrorException;
+
+			HttpRequestHelper.HandleHttpCodes(response.StatusCode);
+
+			return response.Content;
+		}
 
 
-    }
+	}
 }
