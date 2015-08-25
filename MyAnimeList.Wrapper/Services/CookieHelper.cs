@@ -40,12 +40,14 @@ namespace MyAnimeList.Wrapper.Services
 
 		public async Task<HttpResponseMessage> GetResponse()
 		{
-			return await Get("http://myanimelist.net/login.php");
+			return await Get("http://myanimelist.net/login.php?cache=" + Guid.NewGuid());
 		}
 	}
 
 	public class CookieHelper
 	{
+		public static List<Cookie> Cookies = new List<Cookie>();
+
 		private static List<string> ConvertCookieHeaderToArrayList(string strCookHeader)
 		{
 			strCookHeader = strCookHeader.Replace("\r", "");
@@ -133,8 +135,11 @@ namespace MyAnimeList.Wrapper.Services
 			return cc;
 		}
 
-		public async static Task<List<Cookie>> GetCookies(string login, string password, string userAgent)
+		public static async Task GetCookies(string login, string password, string userAgent)
 		{
+			if (Cookies.Any())
+				return;
+
 			var myRestService = new RestService(userAgent);
 
 			var httpResponseMessage = await myRestService.GetResponse();
@@ -239,7 +244,12 @@ namespace MyAnimeList.Wrapper.Services
 			else
 				throw new ServiceException(Resource.NotAuthenticated);
 
-			return cookies;
+			
+			foreach (var cookie in cookies)
+			{
+				Cookies.Add(cookie);
+			}
+
 		}
 	}
 }

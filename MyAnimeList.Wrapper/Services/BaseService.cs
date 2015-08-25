@@ -9,7 +9,6 @@ namespace MyAnimeList.Wrapper.Services
 	public class BaseService
 	{
 		protected RestClient RestClient;
-		protected List<Cookie> Cookies;
 		public string UserAgent { get; set; }
 
 		protected BaseService(string userAgent)
@@ -17,8 +16,6 @@ namespace MyAnimeList.Wrapper.Services
 			RestClient = new RestClient { UserAgent = userAgent };
 
 			UserAgent = userAgent;
-
-			Cookies = new List<Cookie>();
 		}
 
 		protected IRestRequest GetRestRequest(Method method)
@@ -31,19 +28,11 @@ namespace MyAnimeList.Wrapper.Services
 		protected IRestRequest GetRestRequest(Method method, List<Cookie> cookies)
 		{
 			var request = GetRestRequest(method);
-
-			if (cookies != null)
+			
+			foreach (var cookie in cookies)
 			{
-
-				Cookies.Clear();
-
-				foreach (var cookie in cookies)
-				{
-					request.AddCookie(cookie.Name, cookie.Value);
-					Cookies.Add(cookie);
-				}
+				request.AddCookie(cookie.Name, cookie.Value);
 			}
-
 			return request;
 		}
 
