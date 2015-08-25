@@ -112,8 +112,13 @@ namespace MyAnimeList.Wrapper.Services
 
 			if (rankNode != null)
 			{
-				var regex = Regex.Match(rankNode.InnerText, @"\d+");
-				animeDetail.Rank = Convert.ToInt32(regex.ToString());
+				if (rankNode.InnerText.ToUpper().Contains("N/A"))
+					animeDetail.Rank = 0;
+				else
+				{
+					var regex = Regex.Match(rankNode.InnerText, @"\d+");
+					animeDetail.Rank = Convert.ToInt32(regex.ToString());
+				}
 			}
 
 			var titleNode = document.DocumentNode.SelectSingleNode("//h1");
