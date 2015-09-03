@@ -74,11 +74,11 @@ namespace MyAnimeList.Wrapper.Services
 
 		public async Task<MangaDetail> GetMangaDetailAsync(string login, string password, int mangaId)
 		{
-			await CookieHelper.GetCookies(login, password, UserAgent);
+			var cookies = await CookieHelper.GetCookies(login, password, UserAgent);
 
 			RestClient.BaseUrl = new Uri(string.Format("http://myanimelist.net/manga/{0}", mangaId));
 
-			var request = GetRestRequest(Method.GET, CookieHelper.Cookies);
+			var request = GetRestRequest(Method.GET, cookies);
 
 			var result = await ExecuteTaskASync(request).ConfigureAwait(false);
 

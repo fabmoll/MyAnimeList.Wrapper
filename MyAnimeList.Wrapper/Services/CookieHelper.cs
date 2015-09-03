@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.IsolatedStorage;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -46,8 +47,6 @@ namespace MyAnimeList.Wrapper.Services
 
 	public class CookieHelper
 	{
-		public static List<Cookie> Cookies = new List<Cookie>();
-
 		private static List<string> ConvertCookieHeaderToArrayList(string strCookHeader)
 		{
 			strCookHeader = strCookHeader.Replace("\r", "");
@@ -135,102 +134,112 @@ namespace MyAnimeList.Wrapper.Services
 			return cc;
 		}
 
-		public static async Task GetCookies(string login, string password, string userAgent)
+		public static async Task<List<Cookie>> GetCookies(string login, string password, string userAgent)
 		{
-			if (Cookies.Any())
-				return;
+			IsolatedStorageSettings isoStoreSettings = IsolatedStorageSettings.ApplicationSettings;
 
-			var myRestService = new RestService(userAgent);
-
-			var httpResponseMessage = await myRestService.GetResponse();
-
-			var cookieHeader = httpResponseMessage.Headers["Set-Cookie"];
-
-			var content = await httpResponseMessage.Content.ReadAsStringAsync();
-
-			var document = new HtmlDocument();
-
-			document.LoadHtml(content);
-
-			var csrfTokenNode = document.DocumentNode.SelectSingleNode("//meta[@name='csrf_token']");
-			var csrfToken = csrfTokenNode.Attributes["content"].Value;
-
-			HttpWebResponse response;
-
-			response = null;
-
-			try
+			if (!isoStoreSettings.Contains("Cookie") || string.IsNullOrEmpty(isoStoreSettings["Cookie"] as string))
 			{
-				//var cookieCollection = new CookieCollection();
-				//var httpWebRequest = (HttpWebRequest)WebRequest.Create(@"http://myanimelist.net");
-				//httpWebRequest.UserAgent = "api-MyAnimeList-2BDDAF54629E4708EF4694AB0FF6DB75";
-				//httpWebRequest.Headers["User-Agent"] = "api-MyAnimeList-2BDDAF54629E4708EF4694AB0FF6DB75";
-				////httpWebRequest.CookieContainer = new CookieContainer();
-				////httpWebRequest.CookieContainer.Add(new Uri(@"http://myanimelist.net"), cookieCollection);
-				//httpWebRequest.AllowAutoRedirect = false;
-				//var webResponse = await httpWebRequest.GetResponseAsync();
-				//var httpWebResponse = (HttpWebResponse)webResponse;
+				var myRestService = new RestService(userAgent);
 
-				//var setCookieHeader = httpWebResponse.Headers["Set-Cookie"];
+				var httpResponseMessage = await myRestService.GetResponse();
 
-				var cc = new CookieCollection();
-				if (cookieHeader != string.Empty)
+				var cookieHeader = httpResponseMessage.Headers["Set-Cookie"];
+
+
+				var content = await httpResponseMessage.Content.ReadAsStringAsync();
+
+				var document = new HtmlDocument();
+
+				document.LoadHtml(content);
+
+				var csrfTokenNode = document.DocumentNode.SelectSingleNode("//meta[@name='csrf_token']");
+				var csrfToken = csrfTokenNode.Attributes["content"].Value;
+
+				HttpWebResponse response;
+
+				response = null;
+
+				try
 				{
-					var al = ConvertCookieHeaderToArrayList(cookieHeader);
-					cc = ConvertCookieArraysToCookieCollection(al, @"http://myanimelist.net");
+					//var cookieCollection = new CookieCollection();
+					//var httpWebRequest = (HttpWebRequest)WebRequest.Create(@"http://myanimelist.net");
+					//httpWebRequest.UserAgent = "api-MyAnimeList-2BDDAF54629E4708EF4694AB0FF6DB75";
+					//httpWebRequest.Headers["User-Agent"] = "api-MyAnimeList-2BDDAF54629E4708EF4694AB0FF6DB75";
+					////httpWebRequest.CookieContainer = new CookieContainer();
+					////httpWebRequest.CookieContainer.Add(new Uri(@"http://myanimelist.net"), cookieCollection);
+					//httpWebRequest.AllowAutoRedirect = false;
+					//var webResponse = await httpWebRequest.GetResponseAsync();
+					//var httpWebResponse = (HttpWebResponse)webResponse;
+
+					//var setCookieHeader = httpWebResponse.Headers["Set-Cookie"];
+
+					var cc = new CookieCollection();
+					if (cookieHeader != string.Empty)
+					{
+						var al = ConvertCookieHeaderToArrayList(cookieHeader);
+						cc = ConvertCookieArraysToCookieCollection(al, @"http://myanimelist.net");
+					}
+
+
+					var webRequest = (HttpWebRequest)WebRequest.Create("http://myanimelist.net/login.php");
+
+					webRequest.CookieContainer = new CookieContainer();
+					webRequest.CookieContainer.Add(new Uri("http://myanimelist.net/login.php"), cc);
+					webRequest.Headers["Connection"] = "Keep-Alive";
+					webRequest.Headers["Cache-Control"] = "max-age=0";
+					webRequest.Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8";
+					webRequest.Headers["Origin"] = @"http://myanimelist.net";
+					webRequest.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36";
+					webRequest.ContentType = "application/x-www-form-urlencoded";
+					webRequest.Headers["Accept-Encoding"] = "gzip, deflate";
+					webRequest.Headers["Accept-Language"] = "en-US,en;q=0.8,fr;q=0.6";
+					webRequest.AllowAutoRedirect = false;
+
+					webRequest.Method = "POST";
+
+					string body = string.Format(@"user_name={0}&password={1}&submit=Login&csrf_token={2}", login, password, csrfToken);
+					byte[] postBytes = Encoding.UTF8.GetBytes(body);
+					webRequest.ContentLength = postBytes.Length;
+					Stream stream = await webRequest.GetRequestStreamAsync();
+					stream.Write(postBytes, 0, postBytes.Length);
+					stream.Close();
+
+					var responseAwait = await webRequest.GetResponseAsync();
+
+					response = (HttpWebResponse)responseAwait;
+
+				}
+				catch (WebException e)
+				{
+					if (e.Status == WebExceptionStatus.ProtocolError) response = (HttpWebResponse)e.Response;
+				}
+				catch (Exception ex)
+				{
+					if (response != null)
+						response.Close();
 				}
 
+				if (response.StatusCode != HttpStatusCode.Found)
+					throw new ServiceException(Resource.NotAuthenticated);
 
-				var webRequest = (HttpWebRequest)WebRequest.Create("http://myanimelist.net/login.php");
-
-				webRequest.CookieContainer = new CookieContainer();
-				webRequest.CookieContainer.Add(new Uri("http://myanimelist.net/login.php"), cc);
-				webRequest.Headers["Connection"] = "Keep-Alive";
-				webRequest.Headers["Cache-Control"] = "max-age=0";
-				webRequest.Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8";
-				webRequest.Headers["Origin"] = @"http://myanimelist.net";
-				webRequest.Headers["User-Agent"] = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36";
-				webRequest.ContentType = "application/x-www-form-urlencoded";
-				webRequest.Headers["Accept-Encoding"] = "gzip, deflate";
-				webRequest.Headers["Accept-Language"] = "en-US,en;q=0.8,fr;q=0.6";
-				webRequest.AllowAutoRedirect = false;
-
-				webRequest.Method = "POST";
-
-				string body = string.Format(@"user_name={0}&password={1}&submit=Login&csrf_token={2}", login, password, csrfToken);
-				byte[] postBytes = Encoding.UTF8.GetBytes(body);
-				webRequest.ContentLength = postBytes.Length;
-				Stream stream = await webRequest.GetRequestStreamAsync();
-				stream.Write(postBytes, 0, postBytes.Length);
-				stream.Close();
-
-				var responseAwait = await webRequest.GetResponseAsync();
-
-				response = (HttpWebResponse)responseAwait;
-
+				var reponseCookies = response.Headers["Set-Cookie"];
+				if (!isoStoreSettings.Contains("Cookie"))
+					isoStoreSettings.Add("Cookie", reponseCookies);
+				else
+				{
+					isoStoreSettings["Cookie"] = reponseCookies;
+				}
 			}
-			catch (WebException e)
-			{
-				if (e.Status == WebExceptionStatus.ProtocolError) response = (HttpWebResponse)e.Response;
-			}
-			catch (Exception ex)
-			{
-				if (response != null) response.Close();
-
-			}
-
-			if (response.StatusCode != HttpStatusCode.Found)
-				throw new ServiceException(Resource.NotAuthenticated);
-
-			var reponseCookies = response.Headers["Set-Cookie"];
+			
 
 			var cookies = new List<Cookie>();
-			if (reponseCookies != null)
+			if (isoStoreSettings["Cookie"] != null)
 			{
 
-				reponseCookies = reponseCookies.Replace("HttpOnly,", "");
-				reponseCookies = reponseCookies.Replace("httponly,", "");
-				var parts = reponseCookies.Split(';')
+				isoStoreSettings["Cookie"] = ((string)isoStoreSettings["Cookie"]).Replace("HttpOnly,", "");
+				isoStoreSettings["Cookie"] = ((string)isoStoreSettings["Cookie"]).Replace("httponly,", "");
+				var parts = ((string)isoStoreSettings["Cookie"]).Split(';')
 				 .Where(i => i.Contains("=")) // filter out empty values
 				 .Select(i => i.Trim().Split('=')) // trim to remove leading blank
 				 .Select(i => new { Name = i.First(), Value = i.Last() });
@@ -244,12 +253,8 @@ namespace MyAnimeList.Wrapper.Services
 			else
 				throw new ServiceException(Resource.NotAuthenticated);
 
-			
-			foreach (var cookie in cookies)
-			{
-				Cookies.Add(cookie);
-			}
 
+			return cookies;
 		}
 	}
 }
