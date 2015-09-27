@@ -108,7 +108,7 @@ namespace MyAnimeList.Wrapper.Services
 			//Title and rank.
 			//Example:
 			//# <h1><div style="float: right; font-size: 13px;">Ranked #96</div>Lucky ☆ Star</h1>
-			var rankNode = document.DocumentNode.SelectSingleNode("//h1//div");
+			var rankNode = document.DocumentNode.SelectSingleNode("//div[@id='contentWrapper']//div");
 
 			if (rankNode != null)
 			{
@@ -121,11 +121,11 @@ namespace MyAnimeList.Wrapper.Services
 				}
 			}
 
-			var titleNode = document.DocumentNode.SelectSingleNode("//h1");
+			var titleNode = document.DocumentNode.SelectSingleNode("//span[@itemprop='name']");
 
 
 			if (titleNode != null)
-				animeDetail.Title = HttpUtility.HtmlDecode(titleNode.ChildNodes[1].InnerText.Trim());
+				animeDetail.Title = HttpUtility.HtmlDecode(titleNode.InnerText.Trim());
 
 			//Image Url
 			var imageNode = document.DocumentNode.SelectSingleNode("//div[@id='content']//tr//td//div//img");
