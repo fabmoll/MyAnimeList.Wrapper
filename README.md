@@ -1,3 +1,5 @@
+[![MyAnimeList MyGet Build Status](https://www.myget.org/BuildSource/Badge/fabmoll?identifier=600666ea-48ed-43d9-9c48-38b13ae3c320)](https://www.myget.org/)
+
 # MyAnimeList.Wrapper
 A Windows Phone 8.1 Wrapper for MyAnimeList
 
