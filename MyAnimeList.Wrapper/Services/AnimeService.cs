@@ -525,7 +525,7 @@ namespace MyAnimeList.Wrapper.Services
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
 							  "Summary:?(.+?<br)");
 
-					if (!string.IsNullOrEmpty(summary.ToString()))
+					if (!string.IsNullOrEmpty(summary.ToString()) && ! summary.ToString().Contains("Summary:<br"))
 					{
 						animeDetail.Summaries = new List<AnimeSummary>();
 
