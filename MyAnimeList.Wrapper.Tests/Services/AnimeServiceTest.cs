@@ -46,7 +46,7 @@ namespace MyAnimeList.Wrapper.Tests.Services
 		[TestMethod]
 		public void GetAnimeDetailAsync()
 		{
-			var result = _animeService.GetAnimeDetailAsync(TestSettings.Login, TestSettings.Password, 20);
+			var result = _animeService.GetAnimeDetailAsync(TestSettings.Login, TestSettings.Password, 6707);
 
 			Assert.IsNotNull(result.Result);
 

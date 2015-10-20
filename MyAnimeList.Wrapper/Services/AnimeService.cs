@@ -430,7 +430,7 @@ namespace MyAnimeList.Wrapper.Services
 					var adaptation =
 						 Regex.Match(
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Adaptation:?(.+?<br)");
+							  "Adaptation:+(.+?<br)");
 
 					if (!string.IsNullOrEmpty(adaptation.ToString()))
 					{
@@ -444,7 +444,7 @@ namespace MyAnimeList.Wrapper.Services
 					var prequel =
 						 Regex.Match(
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Prequel:?(.+?<br)");
+							  "Prequel:+(.+?<br)");
 
 					if (!string.IsNullOrEmpty(prequel.ToString()))
 					{
@@ -458,7 +458,7 @@ namespace MyAnimeList.Wrapper.Services
 					var sequel =
 						 Regex.Match(
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Sequel:?(.+?<br)");
+							  "Sequel:+(.+?<br)");
 
 					if (!string.IsNullOrEmpty(sequel.ToString()))
 					{
@@ -472,7 +472,7 @@ namespace MyAnimeList.Wrapper.Services
 					var sideStory =
 						 Regex.Match(
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Side story:?(.+?<br)");
+							  "Side story:+(.+?<br)");
 
 					if (!string.IsNullOrEmpty(sideStory.ToString()))
 					{
@@ -485,7 +485,7 @@ namespace MyAnimeList.Wrapper.Services
 					var parentStory =
 						 Regex.Match(
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Parent story:?(.+?<br)");
+							  "Parent story:+(.+?<br)");
 
 					if (!string.IsNullOrEmpty(parentStory.ToString()))
 					{
@@ -510,7 +510,7 @@ namespace MyAnimeList.Wrapper.Services
 					var spinOff =
 						 Regex.Match(
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Spin-off:?(.+?<br)");
+							  "Spin-off:+(.+?<br)");
 
 					if (!string.IsNullOrEmpty(spinOff.ToString()))
 					{
@@ -523,7 +523,7 @@ namespace MyAnimeList.Wrapper.Services
 					var summary =
 						 Regex.Match(
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Summary:?(.+?<br)");
+							  "Summary:+(.+?<br)");
 
 					if (!string.IsNullOrEmpty(summary.ToString()) && ! summary.ToString().Contains("Summary:<br"))
 					{
@@ -536,7 +536,7 @@ namespace MyAnimeList.Wrapper.Services
 					var alternativeVersion =
 						 Regex.Match(
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Alternative versions?:?(.+?<br)");
+							  "Alternative versions?:+(.+?<br)");
 
 					if (!string.IsNullOrEmpty(alternativeVersion.ToString()))
 					{
