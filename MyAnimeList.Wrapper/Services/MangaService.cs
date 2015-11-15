@@ -114,7 +114,7 @@ namespace MyAnimeList.Wrapper.Services
 			//  <span style="font-weight: normal;"><small>(Manga)</small></span>
 			//</h1>
 
-			var rankNode = document.DocumentNode.SelectSingleNode("//h1//div");
+			var rankNode = document.DocumentNode.SelectSingleNode("//div[@id='contentWrapper']//div");
 
 			if (rankNode != null)
 			{
@@ -127,11 +127,11 @@ namespace MyAnimeList.Wrapper.Services
 				}
 			}
 
-			var titleNode = document.DocumentNode.SelectSingleNode("//h1");
+			var titleNode = document.DocumentNode.SelectSingleNode("//span[@itemprop='name']");
 
 
 			if (titleNode != null)
-				mangaDetail.Title = HttpUtility.HtmlDecode(titleNode.ChildNodes[1].InnerText.Trim());
+				mangaDetail.Title = HttpUtility.HtmlDecode(titleNode.InnerText.Trim());
 
 			//Image Url
 			var imageNode = document.DocumentNode.SelectSingleNode("//div[@id='content']//tr//td//div//img");
