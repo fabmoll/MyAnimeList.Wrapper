@@ -114,18 +114,32 @@ namespace MyAnimeList.Wrapper.Services
 			//  <span style="font-weight: normal;"><small>(Manga)</small></span>
 			//</h1>
 
-			var rankNode = document.DocumentNode.SelectSingleNode("//div[@id='contentWrapper']//div");
+			var rankNode = document.DocumentNode.SelectSingleNode("//span[contains(.,'Rank')]");
+
 
 			if (rankNode != null)
 			{
-				if (rankNode.InnerText.ToUpper().Contains("N/A"))
+				if (rankNode.NextSibling.InnerText.ToUpper().Contains("N/A"))
 					mangaDetail.Rank = 0;
 				else
 				{
-					var regex = Regex.Match(rankNode.InnerText, @"\d+");
+					var regex = Regex.Match(rankNode.NextSibling.InnerText, @"\d+");
 					mangaDetail.Rank = Convert.ToInt32(regex.ToString());
 				}
 			}
+
+			//var rankNode = document.DocumentNode.SelectSingleNode("//div[@id='contentWrapper']//div");
+
+			//if (rankNode != null)
+			//{
+			//	if (rankNode.InnerText.ToUpper().Contains("N/A"))
+			//		mangaDetail.Rank = 0;
+			//	else
+			//	{
+			//		var regex = Regex.Match(rankNode.InnerText, @"\d+");
+			//		mangaDetail.Rank = Convert.ToInt32(regex.ToString());
+			//	}
+			//}
 
 			var titleNode = document.DocumentNode.SelectSingleNode("//span[@itemprop='name']");
 
@@ -188,10 +202,10 @@ namespace MyAnimeList.Wrapper.Services
 				//#   <a href="http://myanimelist.net/manga.php?mid=23">Dengeki Daioh (Monthly)</a>
 				//# </div>
 
-				var type = leftColumnNodeset.SelectSingleNode("//span[text()='Type:']");
+				var type = document.DocumentNode.SelectSingleNode("//span[contains(.,'Type:')]");
 
 				if (type != null)
-					mangaDetail.Type = type.NextSibling.InnerText.Trim();
+					mangaDetail.Type = type.NextSibling.NextSibling.InnerText.Trim();
 
 				var volume = leftColumnNodeset.SelectSingleNode("//span[text()='Volumes:']");
 

@@ -73,7 +73,7 @@ namespace MyAnimeList.Wrapper.Services
 		public async Task<AnimeDetail> GetAnimeDetailAsync(string login, string password, int animeId)
 		{
 			var cookies = await CookieHelper.GetCookies(login, password, UserAgent);
-			
+
 			RestClient.BaseUrl = new Uri(string.Format("http://myanimelist.net/anime/{0}", animeId));
 
 			var request = GetRestRequest(Method.GET, cookies);
@@ -108,15 +108,17 @@ namespace MyAnimeList.Wrapper.Services
 			//Title and rank.
 			//Example:
 			//# <h1><div style="float: right; font-size: 13px;">Ranked #96</div>Lucky ☆ Star</h1>
-			var rankNode = document.DocumentNode.SelectSingleNode("//div[@id='contentWrapper']//div");
+			//var rankNode = document.DocumentNode.SelectSingleNode("//div[@id='contentWrapper']//div");			
+			var rankNode = document.DocumentNode.SelectSingleNode("//span[contains(.,'Rank')]");
+			
 
 			if (rankNode != null)
 			{
-				if (rankNode.InnerText.ToUpper().Contains("N/A"))
+				if (rankNode.NextSibling.InnerText.ToUpper().Contains("N/A"))
 					animeDetail.Rank = 0;
 				else
 				{
-					var regex = Regex.Match(rankNode.InnerText, @"\d+");
+					var regex = Regex.Match(rankNode.NextSibling.InnerText, @"\d+");
 					animeDetail.Rank = Convert.ToInt32(regex.ToString());
 				}
 			}
@@ -187,10 +189,10 @@ namespace MyAnimeList.Wrapper.Services
 				//# <div><span class="dark_text">Duration:</span> 24 min. per episode</div>
 				//# <div class="spaceit"><span class="dark_text">Rating:</span> PG-13 - Teens 13 or older</div>
 
-				var type = leftColumnNodeset.SelectSingleNode("//span[text()='Type:']");
+				var type = document.DocumentNode.SelectSingleNode("//span[contains(.,'Type:')]");
 
 				if (type != null)
-					animeDetail.Type = type.NextSibling.InnerText.Trim();
+					animeDetail.Type = type.NextSibling.NextSibling.InnerText.Trim();
 
 				var episode = leftColumnNodeset.SelectSingleNode("//span[text()='Episodes:']");
 
@@ -525,7 +527,7 @@ namespace MyAnimeList.Wrapper.Services
 							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
 							  "Summary:+(.+?<br)");
 
-					if (!string.IsNullOrEmpty(summary.ToString()) && ! summary.ToString().Contains("Summary:<br"))
+					if (!string.IsNullOrEmpty(summary.ToString()) && !summary.ToString().Contains("Summary:<br"))
 					{
 						animeDetail.Summaries = new List<AnimeSummary>();
 
@@ -547,7 +549,13 @@ namespace MyAnimeList.Wrapper.Services
 				}
 			}
 
-			var watchedStatusNode = document.DocumentNode.SelectSingleNode("//select[@id='myinfo_status']");
+			//var userStatusBlock = document.DocumentNode.SelectSingleNode("//div[contains(@class,'user-status-block')]").SelectSingleNode("//a[@id='myinfo_status']");
+			//var userStatusBlock = document.DocumentNode.SelectSingleNode("//a[@id='myinfo_status']");
+
+			//var watchedStatusNode = userStatusBlock.SelectSingleNode("//select[@id='myinfo_status']");
+
+			var watchedStatusNode =
+				document.DocumentNode.SelectNodes("//select[@id='myinfo_status']").FirstOrDefault(c => c.InnerHtml.ToUpper().Contains("SELECTED"));
 
 			if (watchedStatusNode != null)
 			{
@@ -562,7 +570,7 @@ namespace MyAnimeList.Wrapper.Services
 				if (selected.FirstOrDefault() != null)
 					animeDetail.WatchedStatus = selected.FirstOrDefault().NextSibling.InnerText;
 			}
-
+			
 			var watchedEpisodeNode = document.DocumentNode.SelectSingleNode("//input[@id='myinfo_watchedeps']");
 
 			if (watchedEpisodeNode != null)
