@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Linq;
+using HtmlAgilityPack;
 using MyAnimeList.Wrapper.Model;
 using MyAnimeList.Wrapper.Model.Anime;
 using MyAnimeList.Wrapper.Resources;
@@ -22,6 +23,8 @@ namespace MyAnimeList.Wrapper.Services
 			: base(userAgent)
 		{
 		}
+
+		#region Service methods
 
 		public async Task<AnimeRoot> FindAnimeListAsync(string login)
 		{
@@ -82,550 +85,64 @@ namespace MyAnimeList.Wrapper.Services
 
 			var animeDetail = new AnimeDetail();
 
-			var document = new HtmlAgilityPack.HtmlDocument();
+			var document = new HtmlDocument();
 
 			document.LoadHtml(result);
 
-			var animeIdInput = document.DocumentNode.SelectSingleNode("//input[@name='aid']");
+			SetId(document, animeDetail);
 
-			//Get Anime Id
-			//Example: <input type="hidden" value="104" name="aid" />
-			if (animeIdInput != null)
-			{
-				animeDetail.Id = Convert.ToInt32(animeIdInput.Attributes["value"].Value);
-			}
-			else
-			{
-				var detailLink = document.DocumentNode.SelectSingleNode("//a[text()='Details']");
+			SetRank(document, animeDetail);
 
-				if (detailLink != null)
-				{
-					var regex = Regex.Match(detailLink.Attributes["href"].Value, @"\d+");
-					animeDetail.Id = Convert.ToInt32(regex.ToString());
-				}
-			}
+			SetTitle(document, animeDetail);
 
-			//Title and rank.
-			//Example:
-			//# <h1><div style="float: right; font-size: 13px;">Ranked #96</div>Lucky ☆ Star</h1>
-			//var rankNode = document.DocumentNode.SelectSingleNode("//div[@id='contentWrapper']//div");			
-			var rankNode = document.DocumentNode.SelectSingleNode("//span[contains(.,'Rank')]");
-			
-
-			if (rankNode != null)
-			{
-				if (rankNode.NextSibling.InnerText.ToUpper().Contains("N/A"))
-					animeDetail.Rank = 0;
-				else
-				{
-					var regex = Regex.Match(rankNode.NextSibling.InnerText, @"\d+");
-					animeDetail.Rank = Convert.ToInt32(regex.ToString());
-				}
-			}
-
-			var titleNode = document.DocumentNode.SelectSingleNode("//span[@itemprop='name']");
-
-
-			if (titleNode != null)
-				animeDetail.Title = HttpUtility.HtmlDecode(titleNode.InnerText.Trim());
-
-			//Image Url
-			var imageNode = document.DocumentNode.SelectSingleNode("//div[@id='content']//tr//td//div//img");
-
-			if (imageNode != null)
-				animeDetail.ImageUrl = imageNode.Attributes["src"].Value;
-
-			//Extract from sections on the left column: Alternative Titles, Information, Statistics, Popular Tags
+			SetImageUrl(document, animeDetail);
 
 			var leftColumnNodeset =
 				 document.DocumentNode.SelectSingleNode("//div[@id='content']//table//tr//td[@class='borderClass']");
 
-			//  # Alternative Titles section.
-			//# Example:
-			//# <h2>Alternative Titles</h2>
-			//# <div class="spaceit_pad"><span class="dark_text">English:</span> Lucky Star/div>
-			//# <div class="spaceit_pad"><span class="dark_text">Synonyms:</span> Lucky Star, Raki ☆ Suta</div>
-			//# <div class="spaceit_pad"><span class="dark_text">Japanese:</span> らき すた</div>
-
 			if (leftColumnNodeset != null)
 			{
-				var englishAlternative = leftColumnNodeset.SelectSingleNode("//span[text()='English:']");
+				SetAnimeAlternativeTitles(leftColumnNodeset, animeDetail);
 
-				animeDetail.OtherTitles = new OtherTitles();
+				SetType(document, animeDetail);
 
-				if (englishAlternative != null)
-				{
-					animeDetail.OtherTitles.English = englishAlternative.NextSibling.InnerText.Split(',').Select(p => p.Trim()).ToList();
-				}
+				SetNumberOfEpisodes(leftColumnNodeset, animeDetail);
 
-				var japaneseAlternative = leftColumnNodeset.SelectSingleNode("//span[text()='Japanese:']");
+				SetStatus(leftColumnNodeset, animeDetail);
 
-				if (japaneseAlternative != null)
-				{
-					animeDetail.OtherTitles.Japanese = japaneseAlternative.NextSibling.InnerText.Split(',').Select(p => p.Trim()).ToList();
-				}
+				SetAiredDate(leftColumnNodeset, animeDetail);
 
-				//# Information section.
-				//# Example:
-				//# <h2>Information</h2>
-				//# <div><span class="dark_text">Type:</span> TV</div>
-				//# <div class="spaceit"><span class="dark_text">Episodes:</span> 24</div>
-				//# <div><span class="dark_text">Status:</span> Finished Airing</div>
-				//# <div class="spaceit"><span class="dark_text">Aired:</span> Apr  9, 2007 to Sep  17, 2007</div>
-				//# <div>
-				//#   <span class="dark_text">Producers:</span>
-				//#   <a href="http://myanimelist.net/anime.php?p=2">Kyoto Animation</a>,
-				//#   <a href="http://myanimelist.net/anime.php?p=104">Lantis</a>,
-				//#   <a href="http://myanimelist.net/anime.php?p=262">Kadokawa Pictures USA</a><sup><small>L</small></sup>,
-				//#   <a href="http://myanimelist.net/anime.php?p=286">Bang Zoom! Entertainment</a>
-				//# </div>
-				//# <div class="spaceit">
-				//#   <span class="dark_text">Genres:</span>
-				//#   <a href="http://myanimelist.net/anime.php?genre[]=4">Comedy</a>,
-				//#   <a href="http://myanimelist.net/anime.php?genre[]=20">Parody</a>,
-				//#   <a href="http://myanimelist.net/anime.php?genre[]=23">School</a>,
-				//#   <a href="http://myanimelist.net/anime.php?genre[]=36">Slice of Life</a>
-				//# </div>
-				//# <div><span class="dark_text">Duration:</span> 24 min. per episode</div>
-				//# <div class="spaceit"><span class="dark_text">Rating:</span> PG-13 - Teens 13 or older</div>
+				SetGenres(leftColumnNodeset, animeDetail);
 
-				var type = document.DocumentNode.SelectSingleNode("//span[contains(.,'Type:')]");
+				SetClassification(leftColumnNodeset, animeDetail);
 
-				if (type != null)
-					animeDetail.Type = type.NextSibling.NextSibling.InnerText.Trim();
+				SetScore(leftColumnNodeset, animeDetail);
 
-				var episode = leftColumnNodeset.SelectSingleNode("//span[text()='Episodes:']");
+				SetPopularityRank(leftColumnNodeset, animeDetail);
 
-				if (episode != null)
-				{
-					int episodes;
-					if (Int32.TryParse(episode.NextSibling.InnerText.Replace(",", ""), out episodes))
-						animeDetail.Episodes = episodes;
-					else
-					{
-						animeDetail.Episodes = null;
-					}
-				}
+				SetMembers(leftColumnNodeset, animeDetail);
 
-				var status = leftColumnNodeset.SelectSingleNode("//span[text()='Status:']");
+				SetFavorite(leftColumnNodeset, animeDetail);
 
-				if (status != null)
-					animeDetail.Status = status.NextSibling.InnerText;
-
-				var aired = leftColumnNodeset.SelectSingleNode("//span[text()='Aired:']");
-
-				if (aired != null)
-				{
-					var airDateText = aired.NextSibling.InnerText;
-
-					if (airDateText.Contains("to"))
-					{
-						var startDateText = airDateText.Substring(0, airDateText.IndexOf("to")).Trim();
-
-						var options = RegexOptions.None;
-						var regex = new Regex(@"[ ]{2,}", options);
-						startDateText = regex.Replace(startDateText, @" ");
-
-						DateTime startDate;
-
-						if (DateTime.TryParseExact(startDateText, "MMM d, yyyy", CultureInfo.InvariantCulture,
-															DateTimeStyles.None, out startDate))
-						{
-							animeDetail.StartDate = startDate.ToString("d");
-						}
-						else
-							animeDetail.StartDate = startDateText;
-
-						if (airDateText.Contains("?"))
-						{
-							animeDetail.EndDate = null;
-						}
-						else
-						{
-							var endDateText = airDateText.Substring(airDateText.IndexOf("to") + 2).Trim();
-
-							endDateText = regex.Replace(endDateText, @" ");
-
-							DateTime endDate;
-
-							if (DateTime.TryParseExact(endDateText, "MMM d, yyyy", CultureInfo.InvariantCulture,
-								 DateTimeStyles.None, out endDate))
-							{
-								animeDetail.EndDate = endDate.ToString("d");
-							}
-							else
-							{
-								animeDetail.EndDate = endDateText;
-							}
-						}
-					}
-					else
-					{
-
-						var startDateText = airDateText.IndexOf("to") == -1 ? airDateText.Trim() : airDateText.Substring(0, airDateText.IndexOf("to")).Trim();
-
-						var options = RegexOptions.None;
-						var regex = new Regex(@"[ ]{2,}", options);
-						startDateText = regex.Replace(startDateText, @" ");
-
-						DateTime startDate;
-
-						if (DateTime.TryParseExact(startDateText, "MMM d, yyyy", CultureInfo.InvariantCulture,
-															DateTimeStyles.NoCurrentDateDefault, out startDate))
-							animeDetail.StartDate = startDate.ToString("d");
-						else if (DateTime.TryParseExact(startDateText, "MMM yyyy", CultureInfo.InvariantCulture,
-																  DateTimeStyles.NoCurrentDateDefault, out startDate))
-						{
-							animeDetail.StartDate = startDate.ToString("d");
-						}
-						else
-							animeDetail.StartDate = startDateText;
-
-						animeDetail.EndDate = null;
-					}
-
-				}
-
-				var genre = leftColumnNodeset.SelectSingleNode("//span[text()='Genres:']");
-
-				if (genre != null)
-				{
-					animeDetail.Genres = genre.ParentNode.ChildNodes.Where(c => c.Name == "a").Select(x => x.InnerText.Trim()).ToList();
-				}
-
-				var classification = leftColumnNodeset.SelectSingleNode("//span[text()='Rating:']");
-
-				if (classification != null)
-				{
-					animeDetail.Classification = Regex.Replace(classification.NextSibling.InnerText, @"\t|\n|\r", "").Trim();
-				}
-
-				//# Statistics
-				//# Example:
-				//# <h2>Statistics</h2>
-				//# <div>
-				//#   <span class="dark_text">Score:</span> 8.41<sup><small>1</small></sup>
-				//#   <small>(scored by 22601 users)</small>
-				//# </div>
-				//# <div class="spaceit"><span class="dark_text">Ranked:</span> #96<sup><small>2</small></sup></div>
-				//# <div><span class="dark_text">Popularity:</span> #15</div>
-				//# <div class="spaceit"><span class="dark_text">Members:</span> 36,961</div>
-				//# <div><span class="dark_text">Favorites:</span> 2,874</div>
-
-				var score = leftColumnNodeset.SelectSingleNode("//span[text()='Score:']");
-
-				if (score != null)
-				{
-					double memberScore;
-					if (double.TryParse(score.NextSibling.NextSibling.InnerText, NumberStyles.Any, CultureInfo.InvariantCulture, out memberScore))
-						animeDetail.MembersScore = memberScore;
-					else
-					{
-						animeDetail.MembersScore = 0;
-					}
-				}
-
-				var popularity = leftColumnNodeset.SelectSingleNode("//span[text()='Popularity:']");
-
-				if (popularity != null)
-				{
-					int popularityRank;
-
-					if (Int32.TryParse(popularity.NextSibling.InnerText.Replace("#", "").Replace(",", ""), out popularityRank))
-						animeDetail.PopularityRank = popularityRank;
-					else
-					{
-						animeDetail.PopularityRank = null;
-					}
-				}
-
-				var member = leftColumnNodeset.SelectSingleNode("//span[text()='Members:']");
-
-				if (member != null)
-				{
-					int memberCount;
-					if (Int32.TryParse(member.NextSibling.InnerText.Replace(",", ""), out memberCount))
-						animeDetail.MembersCount = memberCount;
-					else
-					{
-						animeDetail.MembersCount = null;
-					}
-				}
-
-				var favorite = leftColumnNodeset.SelectSingleNode("//span[text()='Favorites:']");
-
-				if (favorite != null)
-				{
-					int favoritedCount;
-					if (Int32.TryParse(favorite.NextSibling.InnerText.Replace(",", ""), out favoritedCount))
-						animeDetail.FavoritedCount = favoritedCount;
-					else
-					{
-						animeDetail.FavoritedCount = null;
-					}
-				}
-
-
-				//# Popular Tags
-				//# Example:
-				//# <h2>Popular Tags</h2>
-				//# <span style="font-size: 11px;">
-				//#   <a href="http://myanimelist.net/anime.php?tag=comedy" style="font-size: 24px" title="1059 people tagged with comedy">comedy</a>
-				//#   <a href="http://myanimelist.net/anime.php?tag=parody" style="font-size: 11px" title="493 people tagged with parody">parody</a>
-				//#   <a href="http://myanimelist.net/anime.php?tag=school" style="font-size: 12px" title="546 people tagged with school">school</a>
-				//#   <a href="http://myanimelist.net/anime.php?tag=slice of life" style="font-size: 18px" title="799 people tagged with slice of life">slice of life</a>
-				//# </span>
-
-				//Popular global tags are removed from MAL
-				var popularTags = leftColumnNodeset.SelectSingleNode("//span[preceding-sibling::h2[text()='Popular Tags']]");
-
-				if (popularTags != null)
-				{
-					animeDetail.Tags = popularTags.ChildNodes.Where(c => c.Name == "a").Select(x => x.InnerText.Trim()).ToList();
-				}
-
+				SetPopularTags(leftColumnNodeset, animeDetail);
 			}
 
-			//# -
-			//# Extract from sections on the right column: Synopsis, Related Anime, Characters & Voice Actors, Reviews
-			//# Recommendations.
-
-			//Getting table directly doesn't work, the second td inside the first table isn't found...
-
-			//var rightColumnNodeset =
-			//  document.DocumentNode.SelectSingleNode("//div[@id='content']/table/tr/td/div/table");
-
-			//So I get it from the child
 			var rightColumnNodeset = document.DocumentNode.SelectSingleNode("//h2[text()='Synopsis']").ParentNode.ParentNode.ParentNode;
 
 			if (rightColumnNodeset != null)
 			{
-				//# Synopsis
-				//# Example:
-				//# <h2>Synopsis</h2>
-				//# Yotsuba's daily life is full of adventure. She is energetic, curious, and a bit odd &ndash; odd enough to be called strange by her father as well as ignorant of many things that even a five-year-old should know. Because of this, the most ordinary experience can become an adventure for her. As the days progress, she makes new friends and shows those around her that every day can be enjoyable.<br />
-				//# <br />
-				//# [Written by MAL Rewrite]
-				var synopsis = rightColumnNodeset.SelectSingleNode("//h2[text()='Synopsis']");
+				SetSynopsis(rightColumnNodeset, animeDetail);
 
-				if (synopsis != null)
-				{
-					animeDetail.Synopsis = Regex.Replace(HttpUtility.HtmlDecode(synopsis.NextSibling.InnerText), "<br>", "");
-				}
-
-				//  # Related Anime
-				//# Example:
-				//# <td>
-				//#   <br>
-				//#   <h2>Related Anime</h2>
-				//#   Adaptation: <a href="http://myanimelist.net/manga/9548/Higurashi_no_Naku_Koro_ni_Kai_Minagoroshi-hen">Higurashi no Naku Koro ni Kai Minagoroshi-hen</a>,
-				//#   <a href="http://myanimelist.net/manga/9738/Higurashi_no_Naku_Koro_ni_Matsuribayashi-hen">Higurashi no Naku Koro ni Matsuribayashi-hen</a><br>
-				//#   Prequel: <a href="http://myanimelist.net/anime/934/Higurashi_no_Naku_Koro_ni">Higurashi no Naku Koro ni</a><br>
-				//#   Sequel: <a href="http://myanimelist.net/anime/3652/Higurashi_no_Naku_Koro_ni_Rei">Higurashi no Naku Koro ni Rei</a><br>
-				//#   Side story: <a href="http://myanimelist.net/anime/6064/Higurashi_no_Naku_Koro_ni_Kai_DVD_Specials">Higurashi no Naku Koro ni Kai DVD Specials</a><br>
-
-				var relatedAnime = rightColumnNodeset.SelectSingleNode("//h2[text()='Related Anime']");
-
-				if (relatedAnime != null)
-				{
-					//Alternative
-					var adaptation =
-						 Regex.Match(
-							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Adaptation:+(.+?<br)");
-
-					if (!string.IsNullOrEmpty(adaptation.ToString()))
-					{
-
-						animeDetail.MangaAdaptations = new List<MangaSummary>();
-
-						SetMangaSummaryList(animeDetail.MangaAdaptations, adaptation.ToString());
-					}
-
-					//Prequel
-					var prequel =
-						 Regex.Match(
-							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Prequel:+(.+?<br)");
-
-					if (!string.IsNullOrEmpty(prequel.ToString()))
-					{
-
-						animeDetail.Prequels = new List<AnimeSummary>();
-
-						SetAnimeSummaryList(animeDetail.Prequels, prequel.ToString());
-					}
-
-					//Sequel
-					var sequel =
-						 Regex.Match(
-							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Sequel:+(.+?<br)");
-
-					if (!string.IsNullOrEmpty(sequel.ToString()))
-					{
-
-						animeDetail.Sequels = new List<AnimeSummary>();
-
-						SetAnimeSummaryList(animeDetail.Sequels, sequel.ToString());
-					}
-
-					//Side story
-					var sideStory =
-						 Regex.Match(
-							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Side story:+(.+?<br)");
-
-					if (!string.IsNullOrEmpty(sideStory.ToString()))
-					{
-						animeDetail.SideStories = new List<AnimeSummary>();
-
-						SetAnimeSummaryList(animeDetail.SideStories, sideStory.ToString());
-					}
-
-					//Parent story
-					var parentStory =
-						 Regex.Match(
-							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Parent story:+(.+?<br)");
-
-					if (!string.IsNullOrEmpty(parentStory.ToString()))
-					{
-
-						animeDetail.ParentStory = SetAnimeSummaryList(parentStory.ToString());
-					}
-
-					//Character
-					//var character =
-					//	 Regex.Match(
-					//		  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-					//		  "Character:?(.+?<br)");
-
-					//if (!string.IsNullOrEmpty(character.ToString()))
-					//{
-					//	animeDetail.CharacterAnime = new List<AnimeSummary>();
-
-					//	SetAnimeSummaryList(animeDetail.CharacterAnime, character.ToString());
-					//}
-
-					//Spin off
-					var spinOff =
-						 Regex.Match(
-							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Spin-off:+(.+?<br)");
-
-					if (!string.IsNullOrEmpty(spinOff.ToString()))
-					{
-						animeDetail.SpinOffs = new List<AnimeSummary>();
-
-						SetAnimeSummaryList(animeDetail.SpinOffs, spinOff.ToString());
-					}
-
-					//Summary
-					var summary =
-						 Regex.Match(
-							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Summary:+(.+?<br)");
-
-					if (!string.IsNullOrEmpty(summary.ToString()) && !summary.ToString().Contains("Summary:<br"))
-					{
-						animeDetail.Summaries = new List<AnimeSummary>();
-
-						SetAnimeSummaryList(animeDetail.Summaries, summary.ToString());
-					}
-
-					//Alternative version
-					var alternativeVersion =
-						 Regex.Match(
-							  relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
-							  "Alternative versions?:+(.+?<br)");
-
-					if (!string.IsNullOrEmpty(alternativeVersion.ToString()))
-					{
-						animeDetail.AlternativeVersions = new List<AnimeSummary>();
-
-						SetAnimeSummaryList(animeDetail.AlternativeVersions, alternativeVersion.ToString());
-					}
-				}
+				SetRelatedAnime(rightColumnNodeset, animeDetail);
 			}
 
-			//var userStatusBlock = document.DocumentNode.SelectSingleNode("//div[contains(@class,'user-status-block')]").SelectSingleNode("//a[@id='myinfo_status']");
-			//var userStatusBlock = document.DocumentNode.SelectSingleNode("//a[@id='myinfo_status']");
+			SetWatchedStatus(document, animeDetail);
 
-			//var watchedStatusNode = userStatusBlock.SelectSingleNode("//select[@id='myinfo_status']");
+			SetWatchedEpisode(document, animeDetail);
 
-			var watchedStatusNode =
-				document.DocumentNode.SelectNodes("//select[@id='myinfo_status']").FirstOrDefault(c => c.InnerHtml.ToUpper().Contains("SELECTED"));
+			SetMyScore(document, animeDetail);
 
-			if (watchedStatusNode != null)
-			{
-				var selectedOption =
-					 watchedStatusNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
-
-				var selected = from c in selectedOption
-							   from x in c.Attributes
-							   where x.Name.ToLowerInvariant() == "selected"
-							   select c;
-
-				if (selected.FirstOrDefault() != null)
-					animeDetail.WatchedStatus = selected.FirstOrDefault().NextSibling.InnerText;
-			}
-			
-			var watchedEpisodeNode = document.DocumentNode.SelectSingleNode("//input[@id='myinfo_watchedeps']");
-
-			if (watchedEpisodeNode != null)
-			{
-				var value =
-					 watchedEpisodeNode.Attributes.FirstOrDefault(c => c.Name.ToLowerInvariant() == "value");
-
-				if (value != null)
-				{
-					int watched;
-
-					if (Int32.TryParse(value.Value, out watched))
-						animeDetail.WatchedEpisodes = watched;
-					else
-					{
-						animeDetail.WatchedEpisodes = 0;
-					}
-				}
-			}
-
-			var myScoreNode = document.DocumentNode.SelectSingleNode("//select[@id='myinfo_score']");
-
-			if (myScoreNode != null)
-			{
-				var selectedOption =
-					 myScoreNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
-
-				var selected = from c in selectedOption
-							   from x in c.Attributes
-							   where x.Name.ToLowerInvariant() == "selected"
-							   select c;
-
-				if (selected.FirstOrDefault() != null)
-				{
-					var scoreNode = from c in selected.FirstOrDefault().Attributes
-									where c.Name.ToLowerInvariant() == "value"
-									select c;
-
-					var score = scoreNode.FirstOrDefault();
-
-					if (score != null)
-						animeDetail.Score = score.Value == null ? 0 : Convert.ToInt32(score.Value);
-				}
-			}
-
-			var editDetailNode = document.DocumentNode.SelectSingleNode("//a[text()='Edit Details']");
-
-			if (editDetailNode != null)
-			{
-				var hrefValue = editDetailNode.Attributes["href"].Value;
-
-				var regex = Regex.Match(hrefValue, @"\d+");
-
-				animeDetail.ListedAnimeId = Convert.ToInt32(regex.ToString());
-			}
+			SetListedAnimeId(document, animeDetail);
 
 			return animeDetail;
 		}
@@ -661,36 +178,6 @@ namespace MyAnimeList.Wrapper.Services
 
 			return true;
 		}
-
-		private string CreateAnimeValue(int status, int watchedEpisodes, int score)
-		{
-			var xml = new StringBuilder();
-			//if values are not set they're reseted on MAL
-			xml.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-			xml.AppendLine("<entry>");
-			xml.AppendLine("<episode>" + watchedEpisodes + "</episode>");
-			xml.AppendLine("<status>" + status + "</status>");
-			xml.AppendLine("<score>" + score + "</score>");
-			//xml.AppendLine("<download_episodes></download_episodes>");
-			//xml.AppendLine("<storage_type></storage_type>");
-			//xml.AppendLine("<storage_value></storage_value>");
-			//xml.AppendLine("<times_rewatched></times_rewatched>");
-			//xml.AppendLine("<rewatch_value></rewatch_value>");
-			//xml.AppendLine("<date_start></date_start>");
-			//xml.AppendLine("<date_finish></date_finish>");
-			//xml.AppendLine("<priority></priority>");
-			//xml.AppendLine("<enable_discussion></enable_discussion>");
-			//xml.AppendLine("<enable_rewatching></enable_rewatching>");
-			//xml.AppendLine("<comments></comments>");
-			//xml.AppendLine("<fansub_group></fansub_group>");
-			//xml.AppendLine("<tags></tags>");
-			xml.AppendLine("</entry>");
-
-
-			return xml.ToString();
-		}
-
-
 
 		public async Task<bool> UpdateAnimeAsync(string login, string password, int animeId, string status, int watchedEpisodes, int score)
 		{
@@ -842,7 +329,7 @@ namespace MyAnimeList.Wrapper.Services
 
 			var result = await ExecuteTaskASync(request).ConfigureAwait(false);
 
-			var document = new HtmlAgilityPack.HtmlDocument();
+			var document = new HtmlDocument();
 
 			document.LoadHtml(result);
 
@@ -942,6 +429,520 @@ namespace MyAnimeList.Wrapper.Services
 				return true;
 
 			return false;
+		}
+
+		#endregion
+
+		#region Helper methods
+
+		private static void SetListedAnimeId(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var editDetailNode = document.DocumentNode.SelectSingleNode("//a[text()='Edit Details']");
+
+			if (editDetailNode != null)
+			{
+				var hrefValue = editDetailNode.Attributes["href"].Value;
+
+				var regex = Regex.Match(hrefValue, @"\d+");
+
+				animeDetail.ListedAnimeId = Convert.ToInt32(regex.ToString());
+			}
+		}
+
+		private static void SetMyScore(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var myScoreNode = document.DocumentNode.SelectSingleNode("//select[@id='myinfo_score']");
+
+			if (myScoreNode != null)
+			{
+				var selectedOption =
+					myScoreNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
+
+				var selected = from c in selectedOption
+							   from x in c.Attributes
+							   where x.Name.ToLowerInvariant() == "selected"
+							   select c;
+
+				if (selected.FirstOrDefault() != null)
+				{
+					var scoreNode = from c in selected.FirstOrDefault().Attributes
+									where c.Name.ToLowerInvariant() == "value"
+									select c;
+
+					var score = scoreNode.FirstOrDefault();
+
+					if (score != null)
+						animeDetail.Score = score.Value == null ? 0 : Convert.ToInt32(score.Value);
+				}
+			}
+		}
+
+		private static void SetWatchedEpisode(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var watchedEpisodeNode = document.DocumentNode.SelectSingleNode("//input[@id='myinfo_watchedeps']");
+
+			if (watchedEpisodeNode != null)
+			{
+				var value =
+					watchedEpisodeNode.Attributes.FirstOrDefault(c => c.Name.ToLowerInvariant() == "value");
+
+				if (value != null)
+				{
+					int watched;
+
+					if (Int32.TryParse(value.Value, out watched))
+						animeDetail.WatchedEpisodes = watched;
+					else
+					{
+						animeDetail.WatchedEpisodes = 0;
+					}
+				}
+			}
+		}
+
+		private static void SetWatchedStatus(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var watchedStatusNode =
+				document.DocumentNode.SelectNodes("//select[@id='myinfo_status']")
+					.FirstOrDefault(c => c.InnerHtml.ToUpper().Contains("SELECTED"));
+
+			if (watchedStatusNode != null)
+			{
+				var selectedOption =
+					watchedStatusNode.ChildNodes.Where(c => c.Name.ToLowerInvariant() == "option");
+
+				var selected = from c in selectedOption
+							   from x in c.Attributes
+							   where x.Name.ToLowerInvariant() == "selected"
+							   select c;
+
+				if (selected.FirstOrDefault() != null)
+					animeDetail.WatchedStatus = selected.FirstOrDefault().NextSibling.InnerText;
+			}
+		}
+
+		private void SetRelatedAnime(HtmlNode rightColumnNodeset, AnimeDetail animeDetail)
+		{
+			var relatedAnime = rightColumnNodeset.SelectSingleNode("//h2[text()='Related Anime']");
+
+			if (relatedAnime != null)
+			{
+				//Alternative
+				var adaptation =
+					Regex.Match(
+						relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
+						"Adaptation:+(.+?<br)");
+
+				if (!string.IsNullOrEmpty(adaptation.ToString()))
+				{
+					animeDetail.MangaAdaptations = new List<MangaSummary>();
+
+					SetMangaSummaryList(animeDetail.MangaAdaptations, adaptation.ToString());
+				}
+
+				//Prequel
+				var prequel =
+					Regex.Match(
+						relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
+						"Prequel:+(.+?<br)");
+
+				if (!string.IsNullOrEmpty(prequel.ToString()))
+				{
+					animeDetail.Prequels = new List<AnimeSummary>();
+
+					SetAnimeSummaryList(animeDetail.Prequels, prequel.ToString());
+				}
+
+				//Sequel
+				var sequel =
+					Regex.Match(
+						relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
+						"Sequel:+(.+?<br)");
+
+				if (!string.IsNullOrEmpty(sequel.ToString()))
+				{
+					animeDetail.Sequels = new List<AnimeSummary>();
+
+					SetAnimeSummaryList(animeDetail.Sequels, sequel.ToString());
+				}
+
+				//Side story
+				var sideStory =
+					Regex.Match(
+						relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
+						"Side story:+(.+?<br)");
+
+				if (!string.IsNullOrEmpty(sideStory.ToString()))
+				{
+					animeDetail.SideStories = new List<AnimeSummary>();
+
+					SetAnimeSummaryList(animeDetail.SideStories, sideStory.ToString());
+				}
+
+				//Parent story
+				var parentStory =
+					Regex.Match(
+						relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
+						"Parent story:+(.+?<br)");
+
+				if (!string.IsNullOrEmpty(parentStory.ToString()))
+				{
+					animeDetail.ParentStory = SetAnimeSummaryList(parentStory.ToString());
+				}
+
+				//Spin off
+				var spinOff =
+					Regex.Match(
+						relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
+						"Spin-off:+(.+?<br)");
+
+				if (!string.IsNullOrEmpty(spinOff.ToString()))
+				{
+					animeDetail.SpinOffs = new List<AnimeSummary>();
+
+					SetAnimeSummaryList(animeDetail.SpinOffs, spinOff.ToString());
+				}
+
+				//Summary
+				var summary =
+					Regex.Match(
+						relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
+						"Summary:+(.+?<br)");
+
+				if (!string.IsNullOrEmpty(summary.ToString()) && !summary.ToString().Contains("Summary:<br"))
+				{
+					animeDetail.Summaries = new List<AnimeSummary>();
+
+					SetAnimeSummaryList(animeDetail.Summaries, summary.ToString());
+				}
+
+				//Alternative version
+				var alternativeVersion =
+					Regex.Match(
+						relatedAnime.ParentNode.InnerHtml.Substring(relatedAnime.ParentNode.InnerHtml.IndexOf("<h2>")),
+						"Alternative versions?:+(.+?<br)");
+
+				if (!string.IsNullOrEmpty(alternativeVersion.ToString()))
+				{
+					animeDetail.AlternativeVersions = new List<AnimeSummary>();
+
+					SetAnimeSummaryList(animeDetail.AlternativeVersions, alternativeVersion.ToString());
+				}
+			}
+		}
+
+		private static void SetSynopsis(HtmlNode rightColumnNodeset, AnimeDetail animeDetail)
+		{
+			var synopsis = rightColumnNodeset.SelectSingleNode("//h2[text()='Synopsis']");
+
+			if (synopsis != null)
+			{
+				animeDetail.Synopsis = Regex.Replace(HttpUtility.HtmlDecode(synopsis.NextSibling.InnerText), "<br>", "");
+			}
+		}
+
+		private static void SetPopularTags(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var popularTags = leftColumnNodeset.SelectSingleNode("//span[preceding-sibling::h2[text()='Popular Tags']]");
+
+			if (popularTags != null)
+			{
+				animeDetail.Tags = popularTags.ChildNodes.Where(c => c.Name == "a").Select(x => x.InnerText.Trim()).ToList();
+			}
+		}
+
+		private static void SetFavorite(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var favorite = leftColumnNodeset.SelectSingleNode("//span[text()='Favorites:']");
+
+			if (favorite != null)
+			{
+				int favoritedCount;
+				if (Int32.TryParse(favorite.NextSibling.InnerText.Replace(",", ""), out favoritedCount))
+					animeDetail.FavoritedCount = favoritedCount;
+				else
+				{
+					animeDetail.FavoritedCount = null;
+				}
+			}
+		}
+
+		private static void SetMembers(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var member = leftColumnNodeset.SelectSingleNode("//span[text()='Members:']");
+
+			if (member != null)
+			{
+				int memberCount;
+				if (Int32.TryParse(member.NextSibling.InnerText.Replace(",", ""), out memberCount))
+					animeDetail.MembersCount = memberCount;
+				else
+				{
+					animeDetail.MembersCount = null;
+				}
+			}
+		}
+
+		private static void SetPopularityRank(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var popularity = leftColumnNodeset.SelectSingleNode("//span[text()='Popularity:']");
+
+			if (popularity != null)
+			{
+				int popularityRank;
+
+				if (Int32.TryParse(popularity.NextSibling.InnerText.Replace("#", "").Replace(",", ""), out popularityRank))
+					animeDetail.PopularityRank = popularityRank;
+				else
+				{
+					animeDetail.PopularityRank = null;
+				}
+			}
+		}
+
+		private static void SetScore(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var score = leftColumnNodeset.SelectSingleNode("//span[text()='Score:']");
+
+			if (score != null)
+			{
+				double memberScore;
+				if (double.TryParse(score.NextSibling.NextSibling.InnerText, NumberStyles.Any, CultureInfo.InvariantCulture,
+					out memberScore))
+					animeDetail.MembersScore = memberScore;
+				else
+				{
+					animeDetail.MembersScore = 0;
+				}
+			}
+		}
+
+		private static void SetClassification(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var classification = leftColumnNodeset.SelectSingleNode("//span[text()='Rating:']");
+
+			if (classification != null)
+			{
+				animeDetail.Classification = Regex.Replace(classification.NextSibling.InnerText, @"\t|\n|\r", "").Trim();
+			}
+		}
+
+		private static void SetGenres(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var genre = leftColumnNodeset.SelectSingleNode("//span[text()='Genres:']");
+
+			if (genre != null)
+			{
+				animeDetail.Genres = genre.ParentNode.ChildNodes.Where(c => c.Name == "a").Select(x => x.InnerText.Trim()).ToList();
+			}
+		}
+
+		private static void SetAiredDate(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var aired = leftColumnNodeset.SelectSingleNode("//span[text()='Aired:']");
+
+			if (aired != null)
+			{
+				var airDateText = aired.NextSibling.InnerText;
+
+				if (airDateText.Contains("to"))
+				{
+					var startDateText = airDateText.Substring(0, airDateText.IndexOf("to")).Trim();
+
+					var options = RegexOptions.None;
+					var regex = new Regex(@"[ ]{2,}", options);
+					startDateText = regex.Replace(startDateText, @" ");
+
+					DateTime startDate;
+
+					if (DateTime.TryParseExact(startDateText, "MMM d, yyyy", CultureInfo.InvariantCulture,
+						DateTimeStyles.None, out startDate))
+					{
+						animeDetail.StartDate = startDate.ToString("d");
+					}
+					else
+						animeDetail.StartDate = startDateText;
+
+					if (airDateText.Contains("?"))
+					{
+						animeDetail.EndDate = null;
+					}
+					else
+					{
+						var endDateText = airDateText.Substring(airDateText.IndexOf("to") + 2).Trim();
+
+						endDateText = regex.Replace(endDateText, @" ");
+
+						DateTime endDate;
+
+						if (DateTime.TryParseExact(endDateText, "MMM d, yyyy", CultureInfo.InvariantCulture,
+							DateTimeStyles.None, out endDate))
+						{
+							animeDetail.EndDate = endDate.ToString("d");
+						}
+						else
+						{
+							animeDetail.EndDate = endDateText;
+						}
+					}
+				}
+				else
+				{
+					var startDateText = airDateText.IndexOf("to") == -1
+						? airDateText.Trim()
+						: airDateText.Substring(0, airDateText.IndexOf("to")).Trim();
+
+					var options = RegexOptions.None;
+					var regex = new Regex(@"[ ]{2,}", options);
+					startDateText = regex.Replace(startDateText, @" ");
+
+					DateTime startDate;
+
+					if (DateTime.TryParseExact(startDateText, "MMM d, yyyy", CultureInfo.InvariantCulture,
+						DateTimeStyles.NoCurrentDateDefault, out startDate))
+						animeDetail.StartDate = startDate.ToString("d");
+					else if (DateTime.TryParseExact(startDateText, "MMM yyyy", CultureInfo.InvariantCulture,
+						DateTimeStyles.NoCurrentDateDefault, out startDate))
+					{
+						animeDetail.StartDate = startDate.ToString("d");
+					}
+					else
+						animeDetail.StartDate = startDateText;
+
+					animeDetail.EndDate = null;
+				}
+			}
+		}
+
+		private static void SetStatus(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var status = leftColumnNodeset.SelectSingleNode("//span[text()='Status:']");
+
+			if (status != null)
+				animeDetail.Status = status.NextSibling.InnerText;
+		}
+
+		private static void SetNumberOfEpisodes(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var episode = leftColumnNodeset.SelectSingleNode("//span[text()='Episodes:']");
+
+			if (episode != null)
+			{
+				int episodes;
+				if (Int32.TryParse(episode.NextSibling.InnerText.Replace(",", ""), out episodes))
+					animeDetail.Episodes = episodes;
+				else
+				{
+					animeDetail.Episodes = null;
+				}
+			}
+		}
+
+		private static void SetType(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var type = document.DocumentNode.SelectSingleNode("//span[contains(.,'Type:')]");
+
+			if (type != null)
+				animeDetail.Type = type.NextSibling.NextSibling.InnerText.Trim();
+		}
+
+		private static void SetAnimeAlternativeTitles(HtmlNode leftColumnNodeset, AnimeDetail animeDetail)
+		{
+			var englishAlternative = leftColumnNodeset.SelectSingleNode("//span[text()='English:']");
+
+			animeDetail.OtherTitles = new OtherTitles();
+
+			if (englishAlternative != null)
+			{
+				animeDetail.OtherTitles.English = englishAlternative.NextSibling.InnerText.Split(',').Select(p => p.Trim()).ToList();
+			}
+
+			var japaneseAlternative = leftColumnNodeset.SelectSingleNode("//span[text()='Japanese:']");
+
+			if (japaneseAlternative != null)
+			{
+				animeDetail.OtherTitles.Japanese = japaneseAlternative.NextSibling.InnerText.Split(',').Select(p => p.Trim()).ToList();
+			}
+		}
+
+		private static void SetImageUrl(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var imageNode = document.DocumentNode.SelectSingleNode("//div[@id='content']//tr//td//div//img");
+
+			if (imageNode != null)
+				animeDetail.ImageUrl = imageNode.Attributes["src"].Value;
+		}
+
+		private static void SetTitle(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var titleNode = document.DocumentNode.SelectSingleNode("//span[@itemprop='name']");
+
+
+			if (titleNode != null)
+				animeDetail.Title = HttpUtility.HtmlDecode(titleNode.InnerText.Trim());
+		}
+
+		private static void SetRank(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var rankNode = document.DocumentNode.SelectSingleNode("//span[contains(.,'Rank')]");
+
+			if (rankNode != null)
+			{
+				if (rankNode.NextSibling.InnerText.ToUpper().Contains("N/A"))
+					animeDetail.Rank = 0;
+				else
+				{
+					var regex = Regex.Match(rankNode.NextSibling.InnerText, @"\d+");
+					animeDetail.Rank = Convert.ToInt32(regex.ToString());
+				}
+			}
+		}
+
+		private static void SetId(HtmlDocument document, AnimeDetail animeDetail)
+		{
+			var animeIdInput = document.DocumentNode.SelectSingleNode("//input[@name='aid']");
+
+			if (animeIdInput != null)
+			{
+				animeDetail.Id = Convert.ToInt32(animeIdInput.Attributes["value"].Value);
+			}
+			else
+			{
+				var detailLink = document.DocumentNode.SelectSingleNode("//a[text()='Details']");
+
+				if (detailLink != null)
+				{
+					var regex = Regex.Match(detailLink.Attributes["href"].Value, @"\d+");
+					animeDetail.Id = Convert.ToInt32(regex.ToString());
+				}
+			}
+		}
+
+		private string CreateAnimeValue(int status, int watchedEpisodes, int score)
+		{
+			var xml = new StringBuilder();
+			//if values are not set they're reseted on MAL
+			xml.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+			xml.AppendLine("<entry>");
+			xml.AppendLine("<episode>" + watchedEpisodes + "</episode>");
+			xml.AppendLine("<status>" + status + "</status>");
+			xml.AppendLine("<score>" + score + "</score>");
+			//xml.AppendLine("<download_episodes></download_episodes>");
+			//xml.AppendLine("<storage_type></storage_type>");
+			//xml.AppendLine("<storage_value></storage_value>");
+			//xml.AppendLine("<times_rewatched></times_rewatched>");
+			//xml.AppendLine("<rewatch_value></rewatch_value>");
+			//xml.AppendLine("<date_start></date_start>");
+			//xml.AppendLine("<date_finish></date_finish>");
+			//xml.AppendLine("<priority></priority>");
+			//xml.AppendLine("<enable_discussion></enable_discussion>");
+			//xml.AppendLine("<enable_rewatching></enable_rewatching>");
+			//xml.AppendLine("<comments></comments>");
+			//xml.AppendLine("<fansub_group></fansub_group>");
+			//xml.AppendLine("<tags></tags>");
+			xml.AppendLine("</entry>");
+
+			return xml.ToString();
 		}
 
 		private string GetTopAnimeType(TopAnimeType topAnimeType)
@@ -1059,7 +1060,7 @@ namespace MyAnimeList.Wrapper.Services
 
 		private void SetMangaSummaryList(List<MangaSummary> mangaSummaries, string htmlContent)
 		{
-			var relatedDocument = new HtmlAgilityPack.HtmlDocument();
+			var relatedDocument = new HtmlDocument();
 
 			relatedDocument.LoadHtml(htmlContent);
 
@@ -1094,7 +1095,7 @@ namespace MyAnimeList.Wrapper.Services
 
 		private void SetAnimeSummaryList(List<AnimeSummary> animeSummaries, string htmlContent)
 		{
-			var relatedDocument = new HtmlAgilityPack.HtmlDocument();
+			var relatedDocument = new HtmlDocument();
 
 			relatedDocument.LoadHtml(htmlContent);
 
@@ -1129,7 +1130,7 @@ namespace MyAnimeList.Wrapper.Services
 
 		private AnimeSummary SetAnimeSummaryList(string htmlContent)
 		{
-			var relatedDocument = new HtmlAgilityPack.HtmlDocument();
+			var relatedDocument = new HtmlDocument();
 
 			relatedDocument.LoadHtml(htmlContent);
 
@@ -1162,6 +1163,8 @@ namespace MyAnimeList.Wrapper.Services
 			}
 
 			return animeSummary;
-		}
+		} 
+
+		#endregion
 	}
 }
