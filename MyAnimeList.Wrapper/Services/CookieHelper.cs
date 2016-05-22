@@ -146,7 +146,6 @@ namespace MyAnimeList.Wrapper.Services
 
 				var cookieHeader = httpResponseMessage.Headers["Set-Cookie"];
 
-
 				var content = await httpResponseMessage.Content.ReadAsStringAsync();
 
 				var document = new HtmlDocument();
@@ -162,25 +161,12 @@ namespace MyAnimeList.Wrapper.Services
 
 				try
 				{
-					//var cookieCollection = new CookieCollection();
-					//var httpWebRequest = (HttpWebRequest)WebRequest.Create(@"http://myanimelist.net");
-					//httpWebRequest.UserAgent = "api-MyAnimeList-2BDDAF54629E4708EF4694AB0FF6DB75";
-					//httpWebRequest.Headers["User-Agent"] = "api-MyAnimeList-2BDDAF54629E4708EF4694AB0FF6DB75";
-					////httpWebRequest.CookieContainer = new CookieContainer();
-					////httpWebRequest.CookieContainer.Add(new Uri(@"http://myanimelist.net"), cookieCollection);
-					//httpWebRequest.AllowAutoRedirect = false;
-					//var webResponse = await httpWebRequest.GetResponseAsync();
-					//var httpWebResponse = (HttpWebResponse)webResponse;
-
-					//var setCookieHeader = httpWebResponse.Headers["Set-Cookie"];
-
 					var cc = new CookieCollection();
 					if (cookieHeader != string.Empty)
 					{
 						var al = ConvertCookieHeaderToArrayList(cookieHeader);
 						cc = ConvertCookieArraysToCookieCollection(al, @"http://myanimelist.net");
 					}
-
 
 					var webRequest = (HttpWebRequest)WebRequest.Create("http://myanimelist.net/login.php");
 
@@ -231,12 +217,11 @@ namespace MyAnimeList.Wrapper.Services
 					isoStoreSettings["Cookie"] = reponseCookies;
 				}
 			}
-			
 
 			var cookies = new List<Cookie>();
+
 			if (isoStoreSettings["Cookie"] != null)
 			{
-
 				isoStoreSettings["Cookie"] = ((string)isoStoreSettings["Cookie"]).Replace("HttpOnly,", "");
 				isoStoreSettings["Cookie"] = ((string)isoStoreSettings["Cookie"]).Replace("httponly,", "");
 				var parts = ((string)isoStoreSettings["Cookie"]).Split(';')
@@ -248,11 +233,9 @@ namespace MyAnimeList.Wrapper.Services
 				{
 					cookies.Add(new Cookie(val.Name, HttpUtility.UrlEncode(val.Value)));
 				}
-
 			}
 			else
 				throw new ServiceException(Resource.NotAuthenticated);
-
 
 			return cookies;
 		}
